@@ -38,15 +38,19 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    @Operation(summary = "Olvidé mi contraseña", description = "Solicita recuperación de contraseña")
-    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    @Operation(summary = "Olvidé mi contraseña", description = "Solicita recuperación de contraseña (requiere autenticación)")
+    public ResponseEntity<Void> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            @Parameter(hidden = true) Authentication authentication) {
         authService.forgotPassword(request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/reset-password")
-    @Operation(summary = "Resetear contraseña", description = "Resetea la contraseña con un token de recuperación")
-    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    @Operation(summary = "Resetear contraseña", description = "Resetea la contraseña con un token de recuperación (requiere autenticación)")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            @Parameter(hidden = true) Authentication authentication) {
         authService.resetPassword(request);
         return ResponseEntity.ok().build();
     }

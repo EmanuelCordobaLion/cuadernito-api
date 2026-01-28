@@ -72,19 +72,28 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("El email ya está registrado");
         }
 
-        User user = User.builder()
-                .firstName(registerRequest.getFirstName())
-                .lastName(registerRequest.getLastName())
-                .email(registerRequest.getEmail())
-                .password(passwordEncoder.encode(registerRequest.getPassword()))
-                .phone(registerRequest.getPhone())
-                .address(registerRequest.getAddress())
-                .role(User.Role.ROLE_USER)
-                .enabled(true)
-                .build();
+        try {
+            User user = User.builder()
+                    .firstName(registerRequest.getFirstName())
+                    .lastName(registerRequest.getLastName())
+                    .email(registerRequest.getEmail())
+                    .password(passwordEncoder.encode(registerRequest.getPassword()))
+                    .phone(registerRequest.getPhone())
+                    .address(registerRequest.getAddress())
+                    .role(User.Role.ROLE_USER)
+                    .enabled(true)
+                    .build();
 
-        User savedUser = userRepository.save(user);
-        return userMapper.toDTO(savedUser);
+            User savedUser = userRepository.save(user);
+            
+            if (userMapper == null) {
+                throw new IllegalStateException("UserMapper no está inicializado");
+            }
+            
+            return userMapper.toDTO(savedUser);
+        } catch (Exception e) {
+            throw new BadRequestException("Error al registrar usuario: " + e.getMessage());
+        }
     }
 
     @Override

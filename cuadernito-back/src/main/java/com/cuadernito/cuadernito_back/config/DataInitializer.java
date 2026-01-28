@@ -30,7 +30,6 @@ public class DataInitializer implements CommandLineRunner {
                     .enabled(true)
                     .build();
             userRepository.save(admin);
-            System.out.println("Usuario ADMIN creado: admin@cuadernito.com / Admin123");
         }
     }
 }
