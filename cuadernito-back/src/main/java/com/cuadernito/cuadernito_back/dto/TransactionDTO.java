@@ -25,5 +25,14 @@ public class TransactionDTO {
     private Long categoryId;
     private Long userId;
     private Long customerDebtId;
+    /** Monto de esta transacción aplicado a la deuda (fiado). Null si no es fiado. */
+    private BigDecimal debtAmount;
+    /** true si la transacción está vinculada a una deuda. */
+    private Boolean esFiado;
+    // --- Solo para request (crear/actualizar): fiado con cliente nuevo ---
+    private String customerFirstName;
+    private String customerLastName;
+    private String customerPhone;
+    private String customerDocumentNumber;
     private LocalDateTime createdAt;
 }

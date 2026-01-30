@@ -12,4 +12,5 @@ public interface CustomerDebtRepository extends JpaRepository<CustomerDebt, Long
     List<CustomerDebt> findByUserId(Long userId);
     Optional<CustomerDebt> findByIdAndUserId(Long id, Long userId);
     boolean existsByIdAndUserId(Long id, Long userId);
+    Optional<CustomerDebt> findByUserIdAndDocumentNumber(Long userId, String documentNumber);
 }

@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface CustomerDebtMapper {
     @Mapping(target = "status", expression = "java(customerDebt.getStatus().name())")
     @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "documentNumber", source = "documentNumber")
     CustomerDebtDTO toDTO(CustomerDebt customerDebt);
 }

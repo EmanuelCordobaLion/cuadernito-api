@@ -23,6 +23,8 @@ public class CustomerDebtDTO {
     private String customerLastName;
     @Size(max = 20, message = "El teléfono no puede superar 20 caracteres")
     private String customerPhone;
+    @Size(max = 50, message = "El número de documento no puede superar 50 caracteres")
+    private String documentNumber;
     @DecimalMin(value = "0.01", message = "El monto total debe ser mayor que cero")
     @Digits(integer = 8, fraction = 2, message = "El monto total tiene formato inválido")
     private BigDecimal totalAmount;

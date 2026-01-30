@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +39,7 @@ public class CustomerDebtServiceImpl implements CustomerDebtService {
 
         validateCustomerNames(customerDebtDTO.getCustomerFirstName(), customerDebtDTO.getCustomerLastName());
         validateCustomerPhone(customerDebtDTO.getCustomerPhone());
+        String documentNumber = validateDocumentNumber(customerDebtDTO.getDocumentNumber());
         BigDecimal totalAmount = validateTotalAmount(customerDebtDTO.getTotalAmount());
         BigDecimal paidAmount = customerDebtDTO.getPaidAmount() != null ? customerDebtDTO.getPaidAmount() : BigDecimal.ZERO;
         if (paidAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -51,6 +53,7 @@ public class CustomerDebtServiceImpl implements CustomerDebtService {
         DebtStatus status = computeStatus(paidAmount, totalAmount);
 
         CustomerDebt customerDebt = CustomerDebt.builder()
+                .documentNumber(documentNumber)
                 .customerFirstName(customerDebtDTO.getCustomerFirstName().trim())
                 .customerLastName(customerDebtDTO.getCustomerLastName().trim())
                 .customerPhone(customerDebtDTO.getCustomerPhone().trim())
@@ -113,6 +116,14 @@ public class CustomerDebtServiceImpl implements CustomerDebtService {
             validateCustomerPhone(customerDebtDTO.getCustomerPhone());
             customerDebt.setCustomerPhone(customerDebtDTO.getCustomerPhone().trim());
         }
+        if (customerDebtDTO.getDocumentNumber() != null) {
+            String doc = validateDocumentNumber(customerDebtDTO.getDocumentNumber());
+            Optional<CustomerDebt> existing = customerDebtRepository.findByUserIdAndDocumentNumber(user.getId(), doc);
+            if (existing.isPresent() && !existing.get().getId().equals(customerDebt.getId())) {
+                throw new BadRequestException("Ya existe una deuda con ese número de documento");
+            }
+            customerDebt.setDocumentNumber(doc);
+        }
         if (customerDebtDTO.getTotalAmount() != null) {
             BigDecimal newTotal = validateTotalAmount(customerDebtDTO.getTotalAmount());
             customerDebt.setTotalAmount(newTotal);
@@ -129,6 +140,31 @@ public class CustomerDebtServiceImpl implements CustomerDebtService {
             customerDebt.setPaidAmount(paid);
             recalculateAmountsAndStatus(customerDebt);
         }
+
+        CustomerDebt updated = customerDebtRepository.save(customerDebt);
+        return customerDebtMapper.toDTO(updated);
+    }
+
+    @Override
+    @Transactional
+    public CustomerDebtDTO registerPayment(Long id, BigDecimal amount, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        CustomerDebt customerDebt = customerDebtRepository.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Deuda del cliente no encontrada"));
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("El monto del pago debe ser mayor que cero");
+        }
+
+        BigDecimal newPaidAmount = customerDebt.getPaidAmount().add(amount);
+        if (newPaidAmount.compareTo(customerDebt.getTotalAmount()) > 0) {
+            newPaidAmount = customerDebt.getTotalAmount();
+        }
+        customerDebt.setPaidAmount(newPaidAmount);
+        customerDebt.setRemainingAmount(customerDebt.getTotalAmount().subtract(newPaidAmount));
+        customerDebt.setStatus(computeStatus(newPaidAmount, customerDebt.getTotalAmount()));
 
         CustomerDebt updated = customerDebtRepository.save(customerDebt);
         return customerDebtMapper.toDTO(updated);
@@ -163,6 +199,20 @@ public class CustomerDebtServiceImpl implements CustomerDebtService {
         if (phone.trim().length() > 20) {
             throw new BadRequestException("El teléfono no puede superar 20 caracteres");
         }
+    }
+
+    private String validateDocumentNumber(String documentNumber) {
+        if (documentNumber == null || documentNumber.trim().isEmpty()) {
+            throw new BadRequestException("El número de documento es obligatorio");
+        }
+        String doc = documentNumber.trim();
+        if (!doc.matches("\\d+")) {
+            throw new BadRequestException("El número de documento debe contener solo dígitos");
+        }
+        if (doc.length() > 50) {
+            throw new BadRequestException("El número de documento no puede superar 50 caracteres");
+        }
+        return doc;
     }
 
     private BigDecimal validateTotalAmount(BigDecimal totalAmount) {
