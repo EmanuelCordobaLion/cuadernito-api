@@ -1,5 +1,6 @@
 package com.cuadernito.cuadernito_back.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -14,7 +15,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Schema(description = "Transacción (response). Incluye datos del cliente cuando es fiado.")
 public class TransactionDTO {
+    @Schema(description = "ID (solo response)")
     private Long id;
     @Positive(message = "El monto debe ser mayor que cero")
     private BigDecimal amount;
@@ -23,16 +26,22 @@ public class TransactionDTO {
     private String type;
     private LocalDateTime date;
     private Long categoryId;
+    @Schema(description = "ID del usuario (solo response)")
     private Long userId;
+    @Schema(description = "ID de la deuda vinculada (solo response si es fiado)")
     private Long customerDebtId;
-    /** Monto de esta transacción aplicado a la deuda (fiado). Null si no es fiado. */
+    @Schema(description = "Monto fiado de esta transacción. Null si no es fiado (solo response)")
     private BigDecimal debtAmount;
-    /** true si la transacción está vinculada a una deuda. */
+    @Schema(description = "true si está vinculada a una deuda (solo response)")
     private Boolean esFiado;
-    // --- Solo para request (crear/actualizar): fiado con cliente nuevo ---
+    @Schema(description = "Nombre del cliente (solo response cuando es fiado)")
     private String customerFirstName;
+    @Schema(description = "Apellido del cliente (solo response cuando es fiado)")
     private String customerLastName;
+    @Schema(description = "Teléfono del cliente (solo response cuando es fiado)")
     private String customerPhone;
+    @Schema(description = "Documento del cliente (solo response cuando es fiado)")
     private String customerDocumentNumber;
+    @Schema(description = "Fecha de creación (solo response)")
     private LocalDateTime createdAt;
 }

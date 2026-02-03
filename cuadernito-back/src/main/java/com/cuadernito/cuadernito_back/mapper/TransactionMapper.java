@@ -13,9 +13,9 @@ public interface TransactionMapper {
     @Mapping(target = "customerDebtId", source = "customerDebt.id")
     @Mapping(target = "debtAmount", source = "debtAmount")
     @Mapping(target = "esFiado", expression = "java(transaction.getCustomerDebt() != null)")
-    @Mapping(target = "customerFirstName", ignore = true)
-    @Mapping(target = "customerLastName", ignore = true)
-    @Mapping(target = "customerPhone", ignore = true)
-    @Mapping(target = "customerDocumentNumber", ignore = true)
+    @Mapping(target = "customerFirstName", expression = "java(transaction.getCustomerDebt() != null ? transaction.getCustomerDebt().getCustomerFirstName() : null)")
+    @Mapping(target = "customerLastName", expression = "java(transaction.getCustomerDebt() != null ? transaction.getCustomerDebt().getCustomerLastName() : null)")
+    @Mapping(target = "customerPhone", expression = "java(transaction.getCustomerDebt() != null ? transaction.getCustomerDebt().getCustomerPhone() : null)")
+    @Mapping(target = "customerDocumentNumber", expression = "java(transaction.getCustomerDebt() != null ? transaction.getCustomerDebt().getDocumentNumber() : null)")
     TransactionDTO toDTO(Transaction transaction);
 }

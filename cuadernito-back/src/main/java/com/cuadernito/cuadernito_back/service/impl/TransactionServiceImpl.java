@@ -50,7 +50,6 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
         validateAmount(transactionDTO.getAmount());
-        // Por defecto INGRESO si no se envía tipo
         TransactionType type = (transactionDTO.getType() == null || transactionDTO.getType().isBlank())
                 ? TransactionType.INGRESO
                 : parseAndValidateType(transactionDTO.getType());
@@ -63,7 +62,9 @@ public class TransactionServiceImpl implements TransactionService {
         BigDecimal debtAmount = null;
 
         if (esFiado) {
-            debtAmount = transactionDTO.getDebtAmount() != null ? transactionDTO.getDebtAmount() : transactionDTO.getAmount();
+            debtAmount = (transactionDTO.getDebtAmount() != null && transactionDTO.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
+                    ? transactionDTO.getDebtAmount()
+                    : transactionDTO.getAmount();
             validateDebtAmount(debtAmount, transactionDTO.getAmount());
 
             // Solo usar deuda existente si se envía un id válido (> 0). 0 o null = cliente nuevo.
@@ -164,7 +165,7 @@ public class TransactionServiceImpl implements TransactionService {
             transaction.setDebtAmount(null);
 
             if (Boolean.TRUE.equals(esFiadoEnRequest)) {
-            BigDecimal nuevoDebtAmount = transactionDTO.getDebtAmount() != null
+            BigDecimal nuevoDebtAmount = (transactionDTO.getDebtAmount() != null && transactionDTO.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
                     ? transactionDTO.getDebtAmount()
                     : transaction.getAmount();
             validateDebtAmount(nuevoDebtAmount, transaction.getAmount());
