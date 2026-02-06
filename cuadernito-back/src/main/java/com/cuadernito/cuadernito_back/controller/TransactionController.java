@@ -1,6 +1,8 @@
 package com.cuadernito.cuadernito_back.controller;
 
+import com.cuadernito.cuadernito_back.dto.CreateTransactionRequest;
 import com.cuadernito.cuadernito_back.dto.TransactionDTO;
+import com.cuadernito.cuadernito_back.dto.UpdateTransactionRequest;
 import com.cuadernito.cuadernito_back.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,12 +25,26 @@ public class TransactionController {
     private TransactionService transactionService;
 
     @PostMapping
-    @Operation(summary = "Crear transacción", description = "Crea una nueva transacción (ingreso o gasto)")
+    @Operation(summary = "Crear transacción", description = "Crea una nueva transacción. Solo envíe los campos que debe llenar; id, userId, createdAt se devuelven en el response.")
     public ResponseEntity<TransactionDTO> createTransaction(
-            @Valid @RequestBody TransactionDTO transactionDTO,
+            @Valid @RequestBody CreateTransactionRequest request,
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
-        TransactionDTO created = transactionService.createTransaction(transactionDTO, email);
+        TransactionDTO dto = TransactionDTO.builder()
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .type(request.getType())
+                .date(request.getDate())
+                .categoryId(request.getCategoryId())
+                .esFiado(request.getEsFiado())
+                .customerDebtId(request.getCustomerDebtId())
+                .debtAmount(request.getDebtAmount())
+                .customerFirstName(request.getCustomerFirstName())
+                .customerLastName(request.getCustomerLastName())
+                .customerPhone(request.getCustomerPhone())
+                .customerDocumentNumber(request.getCustomerDocumentNumber())
+                .build();
+        TransactionDTO created = transactionService.createTransaction(dto, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -52,13 +68,27 @@ public class TransactionController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar transacción", description = "Actualiza una transacción existente del usuario autenticado")
+    @Operation(summary = "Actualizar transacción", description = "Actualización parcial. Solo envíe los campos que desea cambiar.")
     public ResponseEntity<TransactionDTO> updateTransaction(
             @PathVariable Long id,
-            @Valid @RequestBody TransactionDTO transactionDTO,
+            @Valid @RequestBody UpdateTransactionRequest request,
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
-        TransactionDTO updated = transactionService.updateTransaction(id, transactionDTO, email);
+        TransactionDTO dto = TransactionDTO.builder()
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .type(request.getType())
+                .date(request.getDate())
+                .categoryId(request.getCategoryId())
+                .esFiado(request.getEsFiado())
+                .customerDebtId(request.getCustomerDebtId())
+                .debtAmount(request.getDebtAmount())
+                .customerFirstName(request.getCustomerFirstName())
+                .customerLastName(request.getCustomerLastName())
+                .customerPhone(request.getCustomerPhone())
+                .customerDocumentNumber(request.getCustomerDocumentNumber())
+                .build();
+        TransactionDTO updated = transactionService.updateTransaction(id, dto, email);
         return ResponseEntity.ok(updated);
     }
 

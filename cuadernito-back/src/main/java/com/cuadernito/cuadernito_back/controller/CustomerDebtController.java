@@ -1,6 +1,7 @@
 package com.cuadernito.cuadernito_back.controller;
 
 import com.cuadernito.cuadernito_back.dto.CustomerDebtDTO;
+import com.cuadernito.cuadernito_back.dto.RegisterPaymentRequest;
 import com.cuadernito.cuadernito_back.service.CustomerDebtService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -59,6 +60,17 @@ public class CustomerDebtController {
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
         CustomerDebtDTO updated = customerDebtService.updateCustomerDebt(id, customerDebtDTO, email);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/payments")
+    @Operation(summary = "Registrar pago", description = "Registra un pago sobre la deuda (hace decrecer lo que debe el cliente)")
+    public ResponseEntity<CustomerDebtDTO> registerPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody RegisterPaymentRequest request,
+            @Parameter(hidden = true) Authentication authentication) {
+        String email = authentication.getName();
+        CustomerDebtDTO updated = customerDebtService.registerPayment(id, request.getAmount(), email);
         return ResponseEntity.ok(updated);
     }
 

@@ -1,6 +1,7 @@
 package com.cuadernito.cuadernito_back.controller;
 
 import com.cuadernito.cuadernito_back.dto.CategoryDTO;
+import com.cuadernito.cuadernito_back.dto.CreateCategoryRequest;
 import com.cuadernito.cuadernito_back.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,12 +24,13 @@ public class CategoryController {
     private CategoryService categoryService;
 
     @PostMapping
-    @Operation(summary = "Crear categoría", description = "Crea una nueva categoría para el usuario autenticado")
+    @Operation(summary = "Crear categoría", description = "Crea una nueva categoría. Solo envíe el nombre; id y userId se devuelven en el response.")
     public ResponseEntity<CategoryDTO> createCategory(
-            @Valid @RequestBody CategoryDTO categoryDTO,
+            @Valid @RequestBody CreateCategoryRequest request,
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
-        CategoryDTO created = categoryService.createCategory(categoryDTO, email);
+        CategoryDTO dto = CategoryDTO.builder().name(request.getName()).build();
+        CategoryDTO created = categoryService.createCategory(dto, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

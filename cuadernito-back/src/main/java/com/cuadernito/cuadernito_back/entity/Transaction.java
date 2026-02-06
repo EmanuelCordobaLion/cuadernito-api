@@ -50,6 +50,10 @@ public class Transaction {
     @JsonIgnore
     private CustomerDebt customerDebt;
 
+    /** Monto de esta transacción aplicado a la deuda (fiado). Null si no es fiado. */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal debtAmount;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -62,7 +66,7 @@ public class Transaction {
     }
 
     public enum TransactionType {
-        INCOME,
-        EXPENSE
+        INGRESO,
+        GASTO
     }
 }

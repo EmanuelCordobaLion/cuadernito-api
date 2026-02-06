@@ -11,7 +11,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "customer_debts")
+@Table(name = "customer_debts", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "document_number"})
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,6 +23,9 @@ public class CustomerDebt {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "document_number", length = 50)
+    private String documentNumber;
 
     @Column(nullable = false, length = 100)
     private String customerFirstName;
