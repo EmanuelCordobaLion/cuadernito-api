@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "transactions")
@@ -35,10 +37,9 @@ public class Transaction {
     @Column(nullable = false)
     private LocalDateTime date;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
-    private Category category;
+    private List<TransactionItem> items = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -50,7 +51,6 @@ public class Transaction {
     @JsonIgnore
     private CustomerDebt customerDebt;
 
-    /** Monto de esta transacción aplicado a la deuda (fiado). Null si no es fiado. */
     @Column(precision = 10, scale = 2)
     private BigDecimal debtAmount;
 

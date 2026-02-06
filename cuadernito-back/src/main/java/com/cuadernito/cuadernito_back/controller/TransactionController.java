@@ -25,17 +25,16 @@ public class TransactionController {
     private TransactionService transactionService;
 
     @PostMapping
-    @Operation(summary = "Crear transacción", description = "Crea una nueva transacción. Solo envíe los campos que debe llenar; id, userId, createdAt se devuelven en el response.")
+    @Operation(summary = "Crear transacción", description = "Crea una nueva transacción. Solo envíe los campos que debe llenar; id, userId, createdAt se devuelven en el response. amount se calcula de items.")
     public ResponseEntity<TransactionDTO> createTransaction(
             @Valid @RequestBody CreateTransactionRequest request,
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
         TransactionDTO dto = TransactionDTO.builder()
-                .amount(request.getAmount())
                 .description(request.getDescription())
                 .type(request.getType())
                 .date(request.getDate())
-                .categoryId(request.getCategoryId())
+                .items(request.getItems())
                 .esFiado(request.getEsFiado())
                 .customerDebtId(request.getCustomerDebtId())
                 .debtAmount(request.getDebtAmount())
@@ -75,11 +74,11 @@ public class TransactionController {
             @Parameter(hidden = true) Authentication authentication) {
         String email = authentication.getName();
         TransactionDTO dto = TransactionDTO.builder()
-                .amount(request.getAmount())
                 .description(request.getDescription())
                 .type(request.getType())
                 .date(request.getDate())
-                .categoryId(request.getCategoryId())
+                .items(request.getItems())
+                .removeItemIds(request.getRemoveItemIds())
                 .esFiado(request.getEsFiado())
                 .customerDebtId(request.getCustomerDebtId())
                 .debtAmount(request.getDebtAmount())

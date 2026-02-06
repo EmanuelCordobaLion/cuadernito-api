@@ -10,21 +10,14 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
-/**
- * Request para actualizar una transacción (parcial). Solo envíe los campos que desea cambiar.
- * id, userId, createdAt no se envían; se devuelven en el response.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @Schema(description = "Datos para actualizar una transacción (parcial)")
 public class UpdateTransactionRequest {
-
-    @Positive(message = "El monto debe ser mayor que cero")
-    @Schema(description = "Nuevo monto")
-    private BigDecimal amount;
 
     @Size(max = 500, message = "La descripción no puede superar 500 caracteres")
     @Schema(description = "Nueva descripción")
@@ -36,8 +29,12 @@ public class UpdateTransactionRequest {
     @Schema(description = "Nueva fecha")
     private LocalDateTime date;
 
-    @Schema(description = "Nuevo ID de categoría")
-    private Long categoryId;
+    @jakarta.validation.Valid
+    @Schema(description = "Items actualizados. Items con id = actualizar, items sin id = crear nuevo. Si se envía, reemplaza los items existentes (excepto los que están en removeItemIds).")
+    private List<TransactionItemDTO> items;
+
+    @Schema(description = "IDs de items a eliminar")
+    private List<Long> removeItemIds;
 
     @Schema(description = "true/false para marcar o desmarcar como fiado")
     private Boolean esFiado;
