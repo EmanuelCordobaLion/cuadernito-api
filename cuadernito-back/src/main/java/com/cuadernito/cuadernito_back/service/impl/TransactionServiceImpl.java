@@ -1,17 +1,20 @@
 package com.cuadernito.cuadernito_back.service.impl;
 
 import com.cuadernito.cuadernito_back.dto.TransactionDTO;
+import com.cuadernito.cuadernito_back.dto.TransactionItemDTO;
 import com.cuadernito.cuadernito_back.entity.Category;
 import com.cuadernito.cuadernito_back.entity.CustomerDebt;
 import com.cuadernito.cuadernito_back.entity.CustomerDebt.DebtStatus;
 import com.cuadernito.cuadernito_back.entity.Transaction;
 import com.cuadernito.cuadernito_back.entity.Transaction.TransactionType;
+import com.cuadernito.cuadernito_back.entity.TransactionItem;
 import com.cuadernito.cuadernito_back.entity.User;
 import com.cuadernito.cuadernito_back.exception.BadRequestException;
 import com.cuadernito.cuadernito_back.exception.ResourceNotFoundException;
 import com.cuadernito.cuadernito_back.mapper.TransactionMapper;
 import com.cuadernito.cuadernito_back.repository.CategoryRepository;
 import com.cuadernito.cuadernito_back.repository.CustomerDebtRepository;
+import com.cuadernito.cuadernito_back.repository.TransactionItemRepository;
 import com.cuadernito.cuadernito_back.repository.TransactionRepository;
 import com.cuadernito.cuadernito_back.repository.UserRepository;
 import com.cuadernito.cuadernito_back.service.TransactionService;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -41,6 +45,9 @@ public class TransactionServiceImpl implements TransactionService {
     private CustomerDebtRepository customerDebtRepository;
 
     @Autowired
+    private TransactionItemRepository transactionItemRepository;
+
+    @Autowired
     private TransactionMapper transactionMapper;
 
     @Override
@@ -49,11 +56,26 @@ public class TransactionServiceImpl implements TransactionService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        validateAmount(transactionDTO.getAmount());
+        List<TransactionItemDTO> itemsDTO = transactionDTO.getItems();
+        if (itemsDTO == null || itemsDTO.isEmpty()) {
+            throw new BadRequestException("La transacción debe tener al menos un item");
+        }
+        if (itemsDTO.size() < 1) {
+            throw new BadRequestException("La transacción debe tener al menos un item");
+        }
+
+        BigDecimal totalAmount = itemsDTO.stream()
+                .map(item -> {
+                    if (item.getAmount() == null || item.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new BadRequestException("Todos los items deben tener un monto mayor que cero");
+                    }
+                    return item.getAmount();
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         TransactionType type = (transactionDTO.getType() == null || transactionDTO.getType().isBlank())
                 ? TransactionType.INGRESO
                 : parseAndValidateType(transactionDTO.getType());
-        Category category = getCategoryOwnedByUser(transactionDTO.getCategoryId(), user.getId());
 
         LocalDateTime date = transactionDTO.getDate() != null ? transactionDTO.getDate() : LocalDateTime.now();
 
@@ -64,10 +86,9 @@ public class TransactionServiceImpl implements TransactionService {
         if (esFiado) {
             debtAmount = (transactionDTO.getDebtAmount() != null && transactionDTO.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
                     ? transactionDTO.getDebtAmount()
-                    : transactionDTO.getAmount();
-            validateDebtAmount(debtAmount, transactionDTO.getAmount());
+                    : totalAmount;
+            validateDebtAmount(debtAmount, totalAmount);
 
-            // Solo usar deuda existente si se envía un id válido (> 0). 0 o null = cliente nuevo.
             if (isValidExistingDebtId(transactionDTO.getCustomerDebtId())) {
                 customerDebt = customerDebtRepository.findByIdAndUserId(transactionDTO.getCustomerDebtId(), user.getId())
                         .orElseThrow(() -> new ResourceNotFoundException("Deuda del cliente no encontrada"));
@@ -91,17 +112,28 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         Transaction transaction = Transaction.builder()
-                .amount(transactionDTO.getAmount())
+                .amount(totalAmount)
                 .description(transactionDTO.getDescription())
                 .type(type)
                 .date(date)
-                .category(category)
                 .user(user)
                 .customerDebt(customerDebt)
                 .debtAmount(debtAmount)
+                .items(new ArrayList<>())
                 .build();
 
         Transaction saved = transactionRepository.save(transaction);
+
+        for (TransactionItemDTO itemDTO : itemsDTO) {
+            Category category = getCategoryOwnedByUser(itemDTO.getCategoryId(), user.getId());
+            TransactionItem item = TransactionItem.builder()
+                    .transaction(saved)
+                    .category(category)
+                    .amount(itemDTO.getAmount())
+                    .build();
+            saved.getItems().add(transactionItemRepository.save(item));
+        }
+
         return transactionMapper.toDTO(saved);
     }
 
@@ -137,10 +169,9 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Transacción no encontrada"));
 
-        if (transactionDTO.getAmount() != null) {
-            validateAmount(transactionDTO.getAmount());
-            transaction.setAmount(transactionDTO.getAmount());
-        }
+        BigDecimal debtAmountAnterior = transaction.getDebtAmount();
+        CustomerDebt deudaAnterior = transaction.getCustomerDebt();
+
         if (transactionDTO.getDescription() != null) {
             transaction.setDescription(transactionDTO.getDescription());
         }
@@ -150,56 +181,113 @@ public class TransactionServiceImpl implements TransactionService {
         if (transactionDTO.getDate() != null) {
             transaction.setDate(transactionDTO.getDate());
         }
-        if (transactionDTO.getCategoryId() != null) {
-            Category category = getCategoryOwnedByUser(transactionDTO.getCategoryId(), user.getId());
-            transaction.setCategory(category);
+
+        if (transactionDTO.getItems() != null || (transactionDTO.getRemoveItemIds() != null && !transactionDTO.getRemoveItemIds().isEmpty())) {
+            updateTransactionItems(transaction, transactionDTO.getItems(), transactionDTO.getRemoveItemIds(), user.getId());
+            BigDecimal nuevoAmount = transaction.getItems().stream()
+                    .map(TransactionItem::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            transaction.setAmount(nuevoAmount);
         }
+
         Boolean esFiadoEnRequest = transactionDTO.getEsFiado();
         if (esFiadoEnRequest != null) {
-            CustomerDebt deudaActual = transaction.getCustomerDebt();
-            BigDecimal debtAmountActual = transaction.getDebtAmount();
-            if (deudaActual != null && debtAmountActual != null) {
-                subtractFromDebt(deudaActual, debtAmountActual);
+            if (deudaAnterior != null && debtAmountAnterior != null) {
+                subtractFromDebt(deudaAnterior, debtAmountAnterior);
             }
             transaction.setCustomerDebt(null);
             transaction.setDebtAmount(null);
 
-            if (Boolean.TRUE.equals(esFiadoEnRequest)) {
-            BigDecimal nuevoDebtAmount = (transactionDTO.getDebtAmount() != null && transactionDTO.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
-                    ? transactionDTO.getDebtAmount()
-                    : transaction.getAmount();
-            validateDebtAmount(nuevoDebtAmount, transaction.getAmount());
+            if (esFiadoEnRequest) {
+                BigDecimal nuevoDebtAmount = (transactionDTO.getDebtAmount() != null && transactionDTO.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
+                        ? transactionDTO.getDebtAmount()
+                        : transaction.getAmount();
+                validateDebtAmount(nuevoDebtAmount, transaction.getAmount());
 
-            CustomerDebt nuevaDeuda;
-            if (isValidExistingDebtId(transactionDTO.getCustomerDebtId())) {
-                nuevaDeuda = customerDebtRepository.findByIdAndUserId(transactionDTO.getCustomerDebtId(), user.getId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Deuda del cliente no encontrada"));
-                addToDebt(nuevaDeuda, nuevoDebtAmount);
-            } else if (transactionDTO.getCustomerDocumentNumber() != null && !transactionDTO.getCustomerDocumentNumber().trim().isEmpty()) {
-                validateNewCustomerForFiado(transactionDTO);
-                String doc = validateDocumentNumber(transactionDTO.getCustomerDocumentNumber());
-                Optional<CustomerDebt> existing = customerDebtRepository.findByUserIdAndDocumentNumber(user.getId(), doc);
-                if (existing.isPresent()) {
-                    nuevaDeuda = existing.get();
+                CustomerDebt nuevaDeuda;
+                if (isValidExistingDebtId(transactionDTO.getCustomerDebtId())) {
+                    nuevaDeuda = customerDebtRepository.findByIdAndUserId(transactionDTO.getCustomerDebtId(), user.getId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Deuda del cliente no encontrada"));
                     addToDebt(nuevaDeuda, nuevoDebtAmount);
+                } else if (transactionDTO.getCustomerDocumentNumber() != null && !transactionDTO.getCustomerDocumentNumber().trim().isEmpty()) {
+                    validateNewCustomerForFiado(transactionDTO);
+                    String doc = validateDocumentNumber(transactionDTO.getCustomerDocumentNumber());
+                    Optional<CustomerDebt> existing = customerDebtRepository.findByUserIdAndDocumentNumber(user.getId(), doc);
+                    if (existing.isPresent()) {
+                        nuevaDeuda = existing.get();
+                        addToDebt(nuevaDeuda, nuevoDebtAmount);
+                    } else {
+                        nuevaDeuda = createNewCustomerDebt(user,
+                                transactionDTO.getCustomerFirstName().trim(),
+                                transactionDTO.getCustomerLastName().trim(),
+                                transactionDTO.getCustomerPhone().trim(),
+                                doc,
+                                nuevoDebtAmount);
+                    }
                 } else {
-                    nuevaDeuda = createNewCustomerDebt(user,
-                            transactionDTO.getCustomerFirstName().trim(),
-                            transactionDTO.getCustomerLastName().trim(),
-                            transactionDTO.getCustomerPhone().trim(),
-                            doc,
-                            nuevoDebtAmount);
+                    throw new BadRequestException("Para marcar como fiado debe indicar customerDebtId o los datos del cliente (nombre, apellido, teléfono, número de documento)");
                 }
-            } else {
-                throw new BadRequestException("Para marcar como fiado debe indicar customerDebtId o los datos del cliente (nombre, apellido, teléfono, número de documento)");
-            }
                 transaction.setCustomerDebt(nuevaDeuda);
+                transaction.setDebtAmount(nuevoDebtAmount);
+            }
+        } else if ((transactionDTO.getItems() != null || (transactionDTO.getRemoveItemIds() != null && !transactionDTO.getRemoveItemIds().isEmpty())) 
+                && transaction.getCustomerDebt() != null && transaction.getDebtAmount() != null) {
+            BigDecimal nuevoAmount = transaction.getAmount();
+            BigDecimal nuevoDebtAmount = transaction.getDebtAmount().min(nuevoAmount);
+            
+            if (nuevoDebtAmount.compareTo(debtAmountAnterior) != 0) {
+                subtractFromDebt(transaction.getCustomerDebt(), debtAmountAnterior);
+                addToDebt(transaction.getCustomerDebt(), nuevoDebtAmount);
                 transaction.setDebtAmount(nuevoDebtAmount);
             }
         }
 
         Transaction updated = transactionRepository.save(transaction);
         return transactionMapper.toDTO(updated);
+    }
+
+    private void updateTransactionItems(Transaction transaction, List<TransactionItemDTO> itemsDTO, List<Long> removeItemIds, Long userId) {
+        if (removeItemIds != null && !removeItemIds.isEmpty()) {
+            for (Long itemId : removeItemIds) {
+                TransactionItem item = transaction.getItems().stream()
+                        .filter(i -> i.getId().equals(itemId))
+                        .findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("Item no encontrado: " + itemId));
+                transaction.getItems().remove(item);
+                transactionItemRepository.delete(item);
+            }
+        }
+
+        if (itemsDTO != null && !itemsDTO.isEmpty()) {
+            for (TransactionItemDTO itemDTO : itemsDTO) {
+                if (itemDTO.getAmount() == null || itemDTO.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new BadRequestException("Todos los items deben tener un monto mayor que cero");
+                }
+                Category category = getCategoryOwnedByUser(itemDTO.getCategoryId(), userId);
+
+                if (itemDTO.getId() != null) {
+                    TransactionItem item = transaction.getItems().stream()
+                            .filter(i -> i.getId().equals(itemDTO.getId()))
+                            .findFirst()
+                            .orElseThrow(() -> new ResourceNotFoundException("Item no encontrado: " + itemDTO.getId()));
+                    item.setCategory(category);
+                    item.setAmount(itemDTO.getAmount());
+                    transactionItemRepository.save(item);
+                } else {
+                    TransactionItem item = TransactionItem.builder()
+                            .transaction(transaction)
+                            .category(category)
+                            .amount(itemDTO.getAmount())
+                            .build();
+                    TransactionItem saved = transactionItemRepository.save(item);
+                    transaction.getItems().add(saved);
+                }
+            }
+        }
+
+        if (transaction.getItems().isEmpty()) {
+            throw new BadRequestException("La transacción debe tener al menos un item. Si desea eliminar todos los items, elimine la transacción completa.");
+        }
     }
 
     @Override
@@ -215,15 +303,6 @@ public class TransactionServiceImpl implements TransactionService {
             subtractFromDebt(transaction.getCustomerDebt(), transaction.getDebtAmount());
         }
         transactionRepository.delete(transaction);
-    }
-
-    private void validateAmount(BigDecimal amount) {
-        if (amount == null) {
-            throw new BadRequestException("El monto es obligatorio");
-        }
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("El monto debe ser mayor que cero");
-        }
     }
 
     private void validateDebtAmount(BigDecimal debtAmount, BigDecimal transactionAmount) {

@@ -11,22 +11,14 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
-/**
- * Request para crear una transacción. Solo incluye los campos que el usuario debe llenar.
- * id, userId, createdAt se asignan en el servidor y se devuelven en el response.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @Schema(description = "Datos para crear una transacción")
 public class CreateTransactionRequest {
-
-    @NotNull(message = "El monto es obligatorio")
-    @Positive(message = "El monto debe ser mayor que cero")
-    @Schema(description = "Monto de la transacción", example = "1000", requiredMode = Schema.RequiredMode.REQUIRED)
-    private BigDecimal amount;
 
     @Size(max = 500, message = "La descripción no puede superar 500 caracteres")
     @Schema(description = "Descripción opcional")
@@ -38,9 +30,10 @@ public class CreateTransactionRequest {
     @Schema(description = "Fecha de la transacción (por defecto: ahora)")
     private LocalDateTime date;
 
-    @NotNull(message = "La categoría es obligatoria")
-    @Schema(description = "ID de la categoría", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long categoryId;
+    @NotNull(message = "Los items son obligatorios")
+    @jakarta.validation.Valid
+    @Schema(description = "Items de la transacción (desglose por categoría). Mínimo 1 item.", requiredMode = Schema.RequiredMode.REQUIRED)
+    private List<TransactionItemDTO> items;
 
     @Schema(description = "true si es fiado (venta a crédito)")
     private Boolean esFiado;

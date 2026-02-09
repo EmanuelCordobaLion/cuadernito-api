@@ -10,22 +10,27 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "Transacción (response). Incluye datos del cliente cuando es fiado.")
+@Schema(description = "Transacción (response). Incluye items desglosados por categoría y datos del cliente cuando es fiado.")
 public class TransactionDTO {
+    @Schema(description = "IDs de items a eliminar (solo para update)", hidden = true)
+    private List<Long> removeItemIds;
     @Schema(description = "ID (solo response)")
     private Long id;
     @Positive(message = "El monto debe ser mayor que cero")
+    @Schema(description = "Monto total (suma de items)")
     private BigDecimal amount;
     @Size(max = 500, message = "La descripción no puede superar 500 caracteres")
     private String description;
     private String type;
     private LocalDateTime date;
-    private Long categoryId;
+    @Schema(description = "Items de la transacción (desglose por categoría)")
+    private List<TransactionItemDTO> items;
     @Schema(description = "ID del usuario (solo response)")
     private Long userId;
     @Schema(description = "ID de la deuda vinculada (solo response si es fiado)")
